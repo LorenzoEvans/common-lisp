@@ -8,38 +8,23 @@
 
 (ql:quickload "cl-json")
 
+(load "../src/exercise-data")
+
 (defpackage :test-generator
-  (:use :cl)
+  (:use :cl :exercise-data)
   (:export :generate))
 
 (in-package :test-generator)
 
-(defparameter *canonical-data-pathname-defaults*
-  (make-pathname :directory '(:relative "../../problem-specifications/exercises")
-                 :name "canonical-data"
-                 :type "json"))
-
 (defparameter *exercise-pathname-defaults*
   (make-pathname :directory '(:relative "../exercises")))
 
-(defun exercise-pathname (exercise)
-  (make-pathname :directory (list :relative exercise)))
-
-(defun canonical-data-pathname (exercise)
-  (merge-pathnames (exercise-pathname exercise)
-                   *canonical-data-pathname-defaults*))
-
 (defun exercise-directory-pathname (exercise)
-  (merge-pathnames (exercise-pathname exercise) *exercise-pathname-defaults*))
-
-(defun canonical-data (exercise)
-  (let ((pathname (canonical-data-pathname exercise)))
-    (when (probe-file pathname)
-      (with-open-file (stream pathname)
-        (cl-json:decode-json-strict stream)))))
+  (merge-pathnames (make-pathname :directory (list :relative exercise))
+                   *exercise-pathname-defaults*))
 
 (defun write-prologue (stream test-data)
-  (let* ((name (cdr (assoc :exercise test-data)))
+  (let* ((name (exercise-name test-data))
          (test-package (format nil "~a-test" name)))
     (format stream "~
 (ql:quickload ~w)
@@ -76,16 +61,16 @@
 
 
 (defun write-tests (stream test-data)
-  (let ((cases (cdr (assoc :cases test-data)))
-        (package (cdr (assoc :exercise test-data))))
+  (let ((cases (exercise-cases test-data))
+        (package (exercise-name test-data)))
     (dolist (case cases) (write-test stream package case))))
 
 (defun make-exercise-directory (test-data)
   (ensure-directories-exist
-   (exercise-directory-pathname (cdr (assoc :exercise test-data)))))
+   (exercise-directory-pathname (exercise-name test-data))))
 
 (defun make-test-code (test-data)
-  (let* ((exercise (cdr (assoc :exercise test-data)))
+  (let* ((exercise (exercise-name test-data))
          (exercise-directory (exercise-directory-pathname exercise))
          (test-file (make-pathname :name (format nil "~A-test" exercise)
                                    :type "lisp"
@@ -102,7 +87,7 @@
   (declare (ignore test-data)))
 
 (defun generate (exercise)
-  (let ((test-data (canonical-data exercise)))
+  (let ((test-data (read-exercise-data exercise)))
     (if test-data
         (progn
           (make-exercise-directory test-data)
